@@ -143,7 +143,10 @@ export type PlaybackKeyAction =
   | 'select-up'
   | 'select-down'
   | 'play-selected'
-  | 'play-next';
+  | 'play-next'
+  | 'master-volume-up'
+  | 'master-volume-down'
+  | 'master-volume-reset';
 
 // Cart player item
 export interface CartItem {

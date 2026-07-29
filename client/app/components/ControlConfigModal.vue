@@ -206,6 +206,9 @@ const PLAYBACK_ACTIONS: { id: PlaybackKeyAction; labelKey: string }[] = [
   { id: 'select-up',     labelKey: 'controls.selectUp'     },
   { id: 'select-down',   labelKey: 'controls.selectDown'   },
   { id: 'play-selected', labelKey: 'controls.playSelected' },
+  { id: 'master-volume-up',    labelKey: 'controls.masterVolumeUp'    },
+  { id: 'master-volume-down',  labelKey: 'controls.masterVolumeDown'  },
+  { id: 'master-volume-reset', labelKey: 'controls.masterVolumeReset' },
 ];
 
 // Keyboard state

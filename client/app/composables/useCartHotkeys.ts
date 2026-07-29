@@ -48,7 +48,12 @@ export const eventToBinding = (e: KeyboardEvent): CartSlotKeyBinding => ({
 export const useCartHotkeys = () => {
   const { currentProject, selectedItem, selectedItems, saveProject, getAllItemsFlat, toggleItemSelection, findItemByUuid } = useProject();
   const { getCartItem } = useCartItems();
-  const { playCue, stopCue, pauseCue, resumeCue, stopAllCues, activeCues, nextItemOverrideUuid, autoNextItemUuid, setNextItem, triggerGroup, queueLoopContinuation, jumpCue } = useAudioEngine();
+  const { playCue, stopCue, pauseCue, resumeCue, stopAllCues, activeCues, nextItemOverrideUuid, autoNextItemUuid, setNextItem, triggerGroup, queueLoopContinuation, jumpCue, setMasterGain, masterGainDb } = useAudioEngine();
+
+  // Per-press master volume nudge, in dB — matches the MIDI continuous
+  // control's default step (DEFAULT_MASTER_VOLUME_MULTIPLIER in
+  // useMidiController.ts) so keyboard and MIDI feel consistent.
+  const MASTER_VOLUME_KEY_STEP_DB = 1;
 
   const keyMappings = computed(() =>
     currentProject.value?.cartSlotKeys ?? { ...DEFAULT_CART_SLOT_KEYS }
@@ -229,6 +234,21 @@ export const useCartHotkeys = () => {
       if (nextItemOverrideUuid.value) setNextItem(null);
       if (item.type === 'audio') playCue(item as AudioItem);
       else if (item.type === 'group') triggerGroup(item);
+      return;
+    }
+
+    if (action === 'master-volume-up') {
+      setMasterGain(masterGainDb.value + MASTER_VOLUME_KEY_STEP_DB);
+      return;
+    }
+
+    if (action === 'master-volume-down') {
+      setMasterGain(masterGainDb.value - MASTER_VOLUME_KEY_STEP_DB);
+      return;
+    }
+
+    if (action === 'master-volume-reset') {
+      setMasterGain(0);
       return;
     }
   };
