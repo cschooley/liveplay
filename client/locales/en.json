@@ -255,7 +255,10 @@
     "next": "Play Next",
     "gotoItem": "Go to Item",
     "gotoIndex": "Go to Index",
-    "loop": "Loop"
+    "loop": "Loop",
+    "armNext": "Arm Next (don't auto-play)",
+    "armItem": "Arm Item (don't auto-play)",
+    "armIndex": "Arm Index (don't auto-play)"
   },
   "startBehavior": {
     "nothing": "Nothing",

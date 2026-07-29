@@ -405,6 +405,29 @@ export const useAudioEngine = () => {
             if (target) return target.uuid;
           }
           break;
+        // arm-next/arm-item/arm-index resolve identically to their
+        // next/goto-item/goto-index counterparts above — the only difference
+        // is these action strings are meaningless to the server's auto-advance
+        // machinery (resolve_next_item_locked, Seamless Advance), so nothing
+        // ever auto-plays. This computed is the ONLY place that needs to know
+        // about them: arming (the Up Next display + what spacebar fires) is
+        // purely client-side, same as it already is for next/goto-item today.
+        case 'arm-next': {
+          const nextIndex = [...audioItem.index];
+          nextIndex[nextIndex.length - 1]++;
+          const nextItem = findItemByIndex(nextIndex);
+          if (nextItem) return nextItem.uuid;
+          break;
+        }
+        case 'arm-item':
+          if (audioItem.endBehavior.targetUuid) return audioItem.endBehavior.targetUuid;
+          break;
+        case 'arm-index':
+          if (audioItem.endBehavior.targetIndex) {
+            const target = findItemByIndex(audioItem.endBehavior.targetIndex);
+            if (target) return target.uuid;
+          }
+          break;
       }
 
       // Issue #28: an item WITHOUT an end behaviour still arms the next

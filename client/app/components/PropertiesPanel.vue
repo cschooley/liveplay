@@ -229,21 +229,24 @@
             <option value="goto-item">{{ t('endBehavior.gotoItem') }}</option>
             <option value="goto-index">{{ t('endBehavior.gotoIndex') }}</option>
             <option v-if="selectedItem.type === 'audio'" value="loop">{{ t('endBehavior.loop') }}</option>
+            <option value="arm-next">{{ t('endBehavior.armNext') }}</option>
+            <option value="arm-item">{{ t('endBehavior.armItem') }}</option>
+            <option value="arm-index">{{ t('endBehavior.armIndex') }}</option>
           </select>
         </div>
-        
-        <div class="property-field" v-if="endBehaviorAction === 'goto-item'">
+
+        <div class="property-field" v-if="endBehaviorAction === 'goto-item' || endBehaviorAction === 'arm-item'">
           <label>{{ t('properties.targetUuid') }}</label>
-          <input 
-            v-model="endBehaviorTargetUuid" 
+          <input
+            v-model="endBehaviorTargetUuid"
             type="text"
             @change="handleSave"
           />
         </div>
-        
-        <div class="property-field" v-if="endBehaviorAction === 'goto-index'">
+
+        <div class="property-field" v-if="endBehaviorAction === 'goto-index' || endBehaviorAction === 'arm-index'">
           <label>{{ t('properties.targetIndex') }}</label>
-          <input 
+          <input
             :value="formatItemIndex(endBehaviorTargetIndex)"
             @change="handleEndBehaviorIndexChange"
             type="text"

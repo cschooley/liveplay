@@ -4507,27 +4507,49 @@ void ProjectState::arm_next_after_stop(const std::string& stopped_uuid,
             walk(document_["items"], p);
         }
         if (!found) return;
-        // Only the "nothing" end behaviour is armed here — every other action
-        // is auto-advanced by the sequencer itself.
+        // "nothing" and arm-next/arm-item/arm-index are armed here (never
+        // auto-advanced) — every other action (next/goto-item/goto-index/loop)
+        // is auto-advanced by the sequencer itself instead. arm-item/arm-index
+        // carry an explicit target (same fields goto-item/goto-index use) and
+        // arm THAT instead of the structural next sibling — the whole reason
+        // they exist is to arm something a plain structural "next" can't reach,
+        // e.g. escaping a group boundary. Any other action bails out with
+        // nothing armed, same as before this existed.
         std::string action = "nothing";
-        if (found->contains("endBehavior") && (*found)["endBehavior"].is_object())
-            action = json_get_or((*found)["endBehavior"], "action",
-                                 std::string{"nothing"});
-        if (action != "nothing") return;
-
-        // Advance to the next sibling in document order.
-        std::vector<int> next_path = stopped_path;
-        if (!next_path.empty()) {
-            next_path.back()++;
-            const std::string nxt = resolve_index_path_locked(next_path);
-            if (!nxt.empty()) {
-                next_to_arm = nxt;
-            } else if (!was_manual) {
-                // Fell off the end on a natural end → wrap to the first playable
-                // item so a single GO restarts the show. A manual stop leaves
-                // the arming empty (operator is holding the show).
-                next_to_arm = first_playable_item_uuid_locked();
+        std::string arm_target_uuid;
+        std::vector<int> arm_target_index;
+        if (found->contains("endBehavior") && (*found)["endBehavior"].is_object()) {
+            const auto& eb = (*found)["endBehavior"];
+            action = json_get_or(eb, "action", std::string{"nothing"});
+            arm_target_uuid = json_get_or(eb, "targetUuid", std::string{});
+            if (eb.contains("targetIndex") && eb["targetIndex"].is_array()) {
+                for (const auto& v : eb["targetIndex"]) {
+                    if (v.is_number_integer()) arm_target_index.push_back(v.get<int>());
+                }
             }
+        }
+
+        if (action == "arm-item" && !arm_target_uuid.empty()) {
+            next_to_arm = arm_target_uuid;
+        } else if (action == "arm-index" && !arm_target_index.empty()) {
+            next_to_arm = resolve_index_path_locked(arm_target_index);
+        } else if (action == "nothing" || action == "arm-next") {
+            // Advance to the next sibling in document order.
+            std::vector<int> next_path = stopped_path;
+            if (!next_path.empty()) {
+                next_path.back()++;
+                const std::string nxt = resolve_index_path_locked(next_path);
+                if (!nxt.empty()) {
+                    next_to_arm = nxt;
+                } else if (!was_manual) {
+                    // Fell off the end on a natural end → wrap to the first playable
+                    // item so a single GO restarts the show. A manual stop leaves
+                    // the arming empty (operator is holding the show).
+                    next_to_arm = first_playable_item_uuid_locked();
+                }
+            }
+        } else {
+            return;
         }
     }
 

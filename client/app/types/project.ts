@@ -68,11 +68,22 @@ export interface GroupItem extends BaseItem {
   isExpanded: boolean; // UI state
 }
 
-// End behavior options
+// End behavior options.
+//
+// arm-next / arm-item / arm-index mirror next / goto-item / goto-index's
+// target resolution exactly, but only ever arm that target as "Up Next" —
+// they never auto-play it. The server's auto-advance machinery
+// (resolve_next_item_locked, Seamless Advance, arm_next_after_stop) only
+// recognizes 'next'/'goto-item'/'goto-index'/'loop'/'nothing'; an unrecognized
+// action value like these safely falls through to "no auto-advance target"
+// there with no server changes needed — arming is purely a client-side
+// computation (autoNextItemUuid), same mechanism 'next'/'goto-item' already
+// use for what to display as Up Next, just without the auto-play trigger.
 export interface EndBehavior {
-  action: 'nothing' | 'next' | 'goto-item' | 'goto-index' | 'loop';
-  targetUuid?: string; // for goto-item
-  targetIndex?: number[]; // for goto-index
+  action: 'nothing' | 'next' | 'goto-item' | 'goto-index' | 'loop' |
+          'arm-next' | 'arm-item' | 'arm-index';
+  targetUuid?: string; // for goto-item, arm-item
+  targetIndex?: number[]; // for goto-index, arm-index
 }
 
 // Start behavior options
