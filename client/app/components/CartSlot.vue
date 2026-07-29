@@ -56,7 +56,8 @@
           draggable="false"
           @click.stop
         >bomb</span>
-        <span v-if="isPlaying" class="status-pill playing">{{ t('status.playing') }}</span>
+        <span v-if="isLoopingActive" class="status-pill playing looping">{{ t('status.looping') }}</span>
+        <span v-else-if="isPlaying" class="status-pill playing">{{ t('status.playing') }}</span>
         <span v-else-if="isQueuedNext" class="status-pill up-next">{{ t('status.upNext') }}</span>
         <span v-if="isPreviewing" class="status-pill preview">{{ t('status.previewing') }}</span>
         <span v-if="keyLabel" class="key-label">{{ keyLabel }}</span>
@@ -172,6 +173,21 @@
               class="material-symbols-rounded behavior-icon"
               :title="t('behaviors.endLoop')"
             >replay</span>
+            <span
+              v-else-if="item.endBehavior?.action === 'arm-next'"
+              class="material-symbols-rounded behavior-icon"
+              :title="t('behaviors.endArmNext')"
+            >fast_forward</span>
+            <span
+              v-else-if="item.endBehavior?.action === 'arm-item'"
+              class="material-symbols-rounded behavior-icon"
+              :title="t('behaviors.endArmItem')"
+            >fast_forward</span>
+            <span
+              v-else-if="item.endBehavior?.action === 'arm-index'"
+              class="material-symbols-rounded behavior-icon"
+              :title="t('behaviors.endArmIndex')"
+            >fast_forward</span>
           </div>
           
           <!-- Duration -->
@@ -243,6 +259,9 @@ const isPeaking = computed(() => {
   return effectiveLoudness > outputTargetLevels.value.autoVolumeTargetDb + 3;
 });
 const isPlaying = computed(() => props.item ? activeCues.value.has(props.item.uuid) : false);
+const isLoopingActive = computed(() =>
+  isPlaying.value && props.item?.endBehavior?.action === 'loop'
+);
 const isSelected = computed(() => props.item ? selectedItems.value.has(props.item.uuid) : false);
 const isManuallyQueued = computed(() => props.item ? nextItemOverrideUuid.value === props.item.uuid : false);
 const isQueuedNext = computed(() => {
@@ -1091,6 +1110,14 @@ const handleDrop = async (e: DragEvent) => {
   &.playing {
     background-color: var(--color-success);
     color: white;
+  }
+
+  &.playing.looping {
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.18) 0 6px,
+      transparent 6px 12px
+    );
   }
 
   &.up-next {

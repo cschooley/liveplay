@@ -161,6 +161,7 @@ export interface ProjectSettings {
   meterMode?: string;
   defaultTransitionMode?: TransitionMode;
   autoCueNextWithoutEndBehavior?: boolean;
+  spacebarContinuesLoops?: boolean;
   stopAllFadeMs?: number;
   uiScrollToPlaying?: boolean;
   disableAutoVolumeAndTrim?: boolean;

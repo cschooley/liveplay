@@ -264,6 +264,19 @@ export const useMidiController = () => {
     }
 
     if (actionId === 'play-next') {
+      const spacebarContinuesLoops = currentProject.value?.settings?.spacebarContinuesLoops !== false;
+      if (spacebarContinuesLoops) {
+        for (const uuid of activeCues.value.keys()) {
+          const cue = activeCues.value.get(uuid);
+          if (cue?.isPaused) continue;
+          const loopingItem = findProjectItem(uuid);
+          if (loopingItem?.type === 'audio' && loopingItem.endBehavior?.action === 'loop') {
+            queueLoopContinuation(loopingItem, resolveLoopContinuationTarget(loopingItem));
+            return;
+          }
+        }
+      }
+
       const effectiveUuid = nextItemOverrideUuid.value ?? autoNextItemUuid.value;
       if (!effectiveUuid) return;
       const item = findProjectItem(effectiveUuid);

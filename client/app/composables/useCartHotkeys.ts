@@ -206,6 +206,22 @@ export const useCartHotkeys = () => {
     }
 
     if (action === 'play-next') {
+      // If something is actively looping, "Play Next" continues it instead of
+      // blindly starting Up Next alongside a loop that would otherwise never
+      // stop on its own. Opt-out via settings.spacebarContinuesLoops.
+      const spacebarContinuesLoops = currentProject.value?.settings?.spacebarContinuesLoops !== false;
+      if (spacebarContinuesLoops) {
+        for (const uuid of activeCues.value.keys()) {
+          const cue = activeCues.value.get(uuid);
+          if (cue?.isPaused) continue;
+          const loopingItem = findItemByUuid(uuid);
+          if (loopingItem?.type === 'audio' && loopingItem.endBehavior?.action === 'loop') {
+            queueLoopContinuation(loopingItem, resolveLoopContinuationTarget(loopingItem));
+            return;
+          }
+        }
+      }
+
       const effectiveUuid = nextItemOverrideUuid.value ?? autoNextItemUuid.value;
       if (!effectiveUuid) return;
       const item = findItemByUuid(effectiveUuid);

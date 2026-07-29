@@ -99,6 +99,8 @@
     "transitionModeStartNext": "Start next at marker",
     "autoCueNext": "Automatically cue next item even without end behaviour",
     "autoCueNextHelp": "Arms the next item as \"Up Next\" even when the playing item has no end behaviour, so you can step through the playlist with a single GO button. It does not start playback automatically.",
+    "spacebarContinuesLoops": "Play Next continues an active loop instead of overlapping it",
+    "spacebarContinuesLoopsHelp": "When a cue is looping (vamping), pressing Play Next exits the loop and advances it, same as the Continue button — instead of starting Up Next on top of a loop that would otherwise keep playing forever.",
     "useProjectDefault": "Use project default",
     "noneSelected": "Not selected",
     "save": "Save",
@@ -169,6 +171,9 @@
     "endGotoItem": "End: Go To Item",
     "endGotoIndex": "End: Go To Index",
     "endLoop": "End: Loop",
+    "endArmNext": "End: Arm Next (won't auto-play)",
+    "endArmItem": "End: Arm Item (won't auto-play)",
+    "endArmIndex": "End: Arm Index (won't auto-play)",
     "startNextMarker": "Starts next track at {time}"
   },
   "waveform": {
@@ -469,6 +474,7 @@
   },
   "status": {
     "playing": "Playing",
+    "looping": "Playing (Looped)",
     "upNext": "Up Next",
     "previewing": "Preview"
   },

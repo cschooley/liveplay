@@ -54,7 +54,7 @@ import { DEFAULT_AUDIO_ITEM, DEFAULT_GROUP_ITEM, transitionDefaultsForImport, an
 import { applyAutoProcessing, buildWaveformFromChannels, parseWaveformFileData } from '~/utils/audio';
 import { useOutputTarget } from '~/composables/useOutputTarget';
 
-const { currentProject, addItem, consumePendingAutoProcess, updateIndices, saveProject, triggerWaveformUpdate, isLoading, getAllItemsFlat, resolveProjectPath, findItemByUuid, projectEpoch } = useProject();
+const { currentProject, addItem, consumePendingAutoProcess, updateIndices, saveProject, triggerWaveformUpdate, isLoading, getAllItemsFlat, resolveProjectPath, findItemByUuid, findItemByIndex, projectEpoch } = useProject();
 const { t } = useLocalization();
 const { levels: outputTargetLevels } = useOutputTarget();
 const { activeCues, nextItemOverrideUuid } = useAudioEngine();
@@ -582,7 +582,30 @@ const handleAddGroup = () => {
     children: [] // Create a new array for each group to avoid shared references
   } as GroupItem;
 
-  addItem(groupItem);
+  // Insert right after the current selection (same nesting level) so groups
+  // can be added at an arbitrary insertion point, not just appended at the
+  // very end. Falls back to append when nothing is selected.
+  const anchor = selectedItemUuid.value ? findItemByUuid(selectedItemUuid.value) : null;
+  if (!anchor || anchor.index.length === 0) {
+    addItem(groupItem);
+    return;
+  }
+
+  const parentPath = anchor.index.slice(0, -1);
+  const insertAt = anchor.index[anchor.index.length - 1] + 1;
+
+  if (parentPath.length === 0) {
+    currentProject.value.items.splice(insertAt, 0, groupItem);
+    updateIndices(currentProject.value.items);
+  } else {
+    const parent = findItemByIndex(parentPath);
+    if (parent && parent.type === 'group') {
+      parent.children.splice(insertAt, 0, groupItem);
+      updateIndices(parent.children, parentPath);
+    } else {
+      addItem(groupItem);
+    }
+  }
 };
 
 const handleDrop = async (e: DragEvent) => {

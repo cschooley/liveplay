@@ -134,6 +134,19 @@
               <p class="settings-help">{{ t('settings.autoCueNextHelp') }}</p>
             </section>
 
+            <!-- Play Next continues an active loop instead of overlapping it -->
+            <section class="settings-field">
+              <label class="settings-label settings-label--checkbox">
+                <input
+                  type="checkbox"
+                  :checked="spacebarContinuesLoops"
+                  @change="onSpacebarContinuesLoopsChange"
+                />
+                {{ t('settings.spacebarContinuesLoops') }}
+              </label>
+              <p class="settings-help">{{ t('settings.spacebarContinuesLoopsHelp') }}</p>
+            </section>
+
             <!-- Project-wide Stop All fade-out time -->
             <section class="settings-field">
               <label class="settings-label">
@@ -309,6 +322,10 @@ const indexDisplayStart        = computed(() => normalizeIndexDisplayStart((curr
 // Defaults ON (undefined → true) so legacy projects and new projects both
 // arm the next item as "Up Next" for cues without an end behaviour. (#28)
 const autoCueNextWithoutEndBehavior = computed(() => (currentProject.value as any)?.settings?.autoCueNextWithoutEndBehavior !== false);
+// Defaults ON: pressing Play Next while a loop is actively playing continues
+// it (same as the Continue button) instead of starting Up Next alongside a
+// loop that would otherwise keep vamping forever.
+const spacebarContinuesLoops = computed(() => (currentProject.value as any)?.settings?.spacebarContinuesLoops !== false);
 // Project-wide Stop All fade, stored in ms (default 1000). Shown in seconds.
 const stopAllFadeSeconds = computed(() => {
   const ms = (currentProject.value as any)?.settings?.stopAllFadeMs;
@@ -387,6 +404,9 @@ function onIndexDisplayStartChange(e: Event) {
 }
 function onAutoCueNextChange(e: Event) {
   applyPatch({ autoCueNextWithoutEndBehavior: (e.target as HTMLInputElement).checked });
+}
+function onSpacebarContinuesLoopsChange(e: Event) {
+  applyPatch({ spacebarContinuesLoops: (e.target as HTMLInputElement).checked });
 }
 function onStopAllFadeChange(e: Event) {
   const seconds = parseFloat((e.target as HTMLInputElement).value);

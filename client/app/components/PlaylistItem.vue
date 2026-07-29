@@ -75,7 +75,8 @@
           @click.stop
         >bomb</span>
 
-        <span v-if="isPlaying" class="status-pill playing">{{ t('status.playing') }}</span>
+        <span v-if="isLoopingActive" class="status-pill playing looping">{{ t('status.looping') }}</span>
+        <span v-else-if="isPlaying" class="status-pill playing">{{ t('status.playing') }}</span>
         <span v-else-if="isQueuedNext" class="status-pill up-next">{{ t('status.upNext') }}</span>
         <span v-if="isPreviewing" class="status-pill preview">{{ t('status.previewing') }}</span>
 
@@ -133,6 +134,21 @@
             class="material-symbols-rounded behavior-icon"
             :title="t('behaviors.endLoop')"
           >replay</span>
+          <span
+            v-else-if="item.endBehavior?.action === 'arm-next'"
+            class="material-symbols-rounded behavior-icon"
+            :title="t('behaviors.endArmNext')"
+          >fast_forward</span>
+          <span
+            v-else-if="item.endBehavior?.action === 'arm-item'"
+            class="material-symbols-rounded behavior-icon"
+            :title="t('behaviors.endArmItem')"
+          >fast_forward</span>
+          <span
+            v-else-if="item.endBehavior?.action === 'arm-index'"
+            class="material-symbols-rounded behavior-icon"
+            :title="t('behaviors.endArmIndex')"
+          >fast_forward</span>
         </div>
         
         <span v-if="item.type === 'audio'" class="item-duration">{{ durationDisplay }}</span>
@@ -258,6 +274,11 @@ const dragPosition = ref<'top' | 'bottom' | 'group' | null>(null);
 
 const isSelected = computed(() => selectedItems.value.has(props.item.uuid));
 const isPlaying = computed(() => activeCues.value.has(props.item.uuid));
+// Distinct from plain "Playing": this cue is actively looping (vamping) and
+// will keep playing indefinitely until Continue/Jump Cue or a manual stop.
+const isLoopingActive = computed(() =>
+  isPlaying.value && props.item.type === 'audio' && props.item.endBehavior?.action === 'loop'
+);
 // Manual override — drives the button highlight and toggle behaviour
 const isManuallyQueued = computed(() => nextItemOverrideUuid.value === props.item.uuid);
 // Effective "up next" — manual override wins; falls back to auto-derived from end behavior
@@ -1046,6 +1067,14 @@ const findItemByIndex = (index: number[]): AudioItem | GroupItem | null => {
   &.playing {
     background-color: var(--color-danger);
     color: white;
+  }
+
+  &.playing.looping {
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.18) 0 6px,
+      transparent 6px 12px
+    );
   }
 
   &.up-next {
