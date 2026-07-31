@@ -435,10 +435,22 @@ const endBehaviorAction = computed({
     return 'nothing';
   },
   set: (value) => {
+    // Clear any target left over from a previous goto-item/goto-index/
+    // arm-item/arm-index selection when switching to an action that doesn't
+    // use one — otherwise it survives silently and gets picked up later by
+    // anything that reads targetUuid/targetIndex without checking the action
+    // first (e.g. a loop's Continue/Jump Cue resolution), advancing to a
+    // stale target instead of the structural next item.
+    const usesUuid  = value === 'goto-item'  || value === 'arm-item';
+    const usesIndex = value === 'goto-index' || value === 'arm-index';
     if (selectedItem.value?.type === 'audio') {
       audioItem.value.endBehavior.action = value as any;
+      if (!usesUuid)  delete audioItem.value.endBehavior.targetUuid;
+      if (!usesIndex) delete audioItem.value.endBehavior.targetIndex;
     } else if (selectedItem.value?.type === 'group') {
       groupItem.value.endBehavior.action = value as any;
+      if (!usesUuid)  delete groupItem.value.endBehavior.targetUuid;
+      if (!usesIndex) delete groupItem.value.endBehavior.targetIndex;
     }
   }
 });
