@@ -253,6 +253,7 @@
     "delete": "Delete",
     "edit": "Edit",
     "masterMix": "Master",
+    "masterVolumeReadoutTitle": "Master volume — set via keyboard shortcuts or MIDI, independent of the per-output trim below",
     "startNextCountdown": "Time until the next track starts"
   },
   "endBehavior": {

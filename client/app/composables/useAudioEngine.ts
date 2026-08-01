@@ -84,6 +84,15 @@ const pendingLoopContinuations = new Map<string, {
   advanceTarget: { action: 'next' | 'goto-item' | 'goto-index'; targetUuid?: string; targetIndex?: number[] };
 }>();
 
+// A cue with a pending continuation has its live endBehavior armed to
+// 'nothing' (see above) — that looks identical to "no end behaviour
+// configured" to anything reading endBehavior directly, e.g. the Silence
+// Warning banner, which would otherwise fire a false alarm for the several
+// seconds a loop's final pass takes to finish. Exported so callers outside
+// this composable can tell the two apart.
+export const hasPendingLoopContinuation = (uuid: string): boolean =>
+  pendingLoopContinuations.has(uuid);
+
 // Shared by cue-to-continue and jump-cue (keyboard, MIDI, and the per-cue UI
 // buttons): goto-item target → goto-index target → structural next, the same
 // precedence endBehavior already supports for non-loop cues today.
@@ -301,7 +310,24 @@ export const useAudioEngine = () => {
   // jump-cue (keyboard, MIDI, per-cue UI button): stop `item` right now and
   // start whatever it would have advanced to — never touches endBehavior.
   const jumpCue = (item: AudioItem) => {
-    const advanceTarget = resolveLoopContinuationTarget(item);
+    // A Continue may already be in flight for this cue (endBehavior armed to
+    // 'nothing', waiting for the pass to finish naturally). If so, cancel it
+    // and restore the operator's original endBehavior right now instead of
+    // resolving fresh — item.endBehavior currently reads 'nothing' with no
+    // target fields, and more importantly, leaving the pending entry in
+    // place would let it fire a SECOND time once this manual stop reaches
+    // Stopped, double-triggering the next item.
+    const pending = pendingLoopContinuations.get(item.uuid);
+    let advanceTarget: { action: 'next' | 'goto-item' | 'goto-index'; targetUuid?: string; targetIndex?: number[] };
+    if (pending) {
+      pendingLoopContinuations.delete(item.uuid);
+      advanceTarget = pending.advanceTarget;
+      item.endBehavior = { ...pending.originalEndBehavior } as AudioItem['endBehavior'];
+      saveProject();
+      server.updateProjectItem(item.uuid, { endBehavior: item.endBehavior }).catch(() => {});
+    } else {
+      advanceTarget = resolveLoopContinuationTarget(item);
+    }
     let nextItem: AudioItem | GroupItem | null = null;
     if (advanceTarget.action === 'goto-item' && advanceTarget.targetUuid) {
       nextItem = findItemByUuid(advanceTarget.targetUuid);

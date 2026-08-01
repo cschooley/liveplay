@@ -15,6 +15,19 @@
         <span class="icon">⚠</span>
         <span>{{ t('playback.panic') }}</span>
       </button>
+
+      <!-- Master gain readout + meter. masterGainDb is set via keyboard
+           shortcuts / MIDI — nothing else in the UI surfaces its value, so
+           this is the only place an operator can see it without guessing. -->
+      <div class="master-readout" :title="t('playback.masterVolumeReadoutTitle')">
+        <StereoMeter
+          v-if="masterMeterPair"
+          :left-index="masterMeterPair.leftIndex"
+          :right-index="masterMeterPair.rightIndex"
+          label="Master"
+        />
+        <span class="master-db-value">{{ masterGainDb >= 0 ? '+' : '' }}{{ masterGainDb.toFixed(1) }} dB</span>
+      </div>
     </div>
     
     <div class="active-cues">
@@ -104,7 +117,7 @@ import { useLiveplayServer } from '~/composables/useLiveplayServer';
 import { useCueMeters } from '~/composables/useLiveMeters';
 import VolumeSlider from './VolumeSlider.vue';
 
-const { activeCues, panicStop, nextItemOverrideUuid, autoNextItemUuid, setNextItem, playCue, triggerGroup } = useAudioEngine();
+const { activeCues, panicStop, nextItemOverrideUuid, autoNextItemUuid, setNextItem, playCue, triggerGroup, masterGainDb } = useAudioEngine();
 const { findItemByUuid, previewItemUuid, previewCueId, stopPreview, currentProject } = useProject();
 const { playbackMappings } = useCartHotkeys();
 const { t } = useLocalization();
@@ -193,6 +206,16 @@ const outputPairs = computed(() => {
   return pairs;
 });
 
+// The Master meter tracks whatever pair is actually carrying the program
+// right now — main (0/1) normally, or the project's default-device override
+// bus when one is configured. outputPairs() above always resolves that as
+// its first entry (see its own comments), so we just take it, rather than
+// hardcoding 0/1 and showing a silent meter on projects that route
+// elsewhere. This is a *meter* on the same signal masterGainDb controls —
+// the number itself (below) is the authoritative value; per-output trim
+// underneath is a separate, independent gain stage.
+const masterMeterPair = computed(() => outputPairs.value[0] ?? null);
+
 // Preview pill data: when an item is being pre-listened on the headphone bus,
 // this resolves to the item record so we can render its display name.
 const previewingItem = computed(() => {
@@ -264,6 +287,27 @@ const handlePlayNext = () => {
 .controls-left {
   display: flex;
   gap: var(--spacing-sm);
+}
+
+.master-readout {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding-left: var(--spacing-sm);
+  border-left: 2px solid var(--color-border);
+}
+
+.master-db-value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  /* Fits the widest case ("-120.0 dB") so single-digit values don't reflow
+     the controls bar next to it. */
+  display: inline-block;
+  min-width: 9ch;
+  text-align: right;
 }
 
 /* Show Mode — bigger GO / Stop-All buttons. The controls bar grows a little

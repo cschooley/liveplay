@@ -208,7 +208,11 @@ const checkForSilence = () => {
     if (!item || item.type !== 'audio') continue;
     const audioItem = item as any;
     const timeRemaining = cue.duration - cue.currentTime;
-    const hasValidEndBehavior = validateEndBehavior(audioItem);
+    // A cue mid-Continue has its endBehavior armed to 'nothing' for the rest
+    // of this pass, which looks identical to "no end behaviour configured" —
+    // without this check, every Continue would trip a false Silence Warning
+    // for however long the pass has left to run.
+    const hasValidEndBehavior = validateEndBehavior(audioItem) || hasPendingLoopContinuation(uuid);
     cueEndTimes.set(uuid, { time: timeRemaining, hasValidBehavior: hasValidEndBehavior });
   }
 

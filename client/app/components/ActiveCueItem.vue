@@ -37,7 +37,7 @@
             <span class="material-symbols-rounded">skip_next</span>
           </button>
           <button
-            v-if="isLooping"
+            v-if="canJumpCue"
             class="action-btn jump-cue-btn"
             @click="handleJumpCue"
             :title="t('actions.jumpCue')"
@@ -141,6 +141,11 @@ const audioItem = computed<AudioItem | null>(() => {
 });
 
 const isLooping = computed(() => audioItem.value?.endBehavior.action === 'loop');
+// Continue arms endBehavior to 'nothing' for the rest of this pass, which
+// flips isLooping false immediately — but Jump Cue should stay available
+// through that window so the operator can still hard-cut instead of waiting
+// out the pass, rather than losing the option the moment Continue is pressed.
+const canJumpCue = computed(() => isLooping.value || hasPendingLoopContinuation(props.cue.uuid));
 
 // Start Next marker (absolute file time) from the project item, if armed.
 const startNextTime = computed<number | null>(() => {
