@@ -1965,7 +1965,8 @@ const menuTranslations = Object.entries(localeFiles).reduce((acc, [code, data]) 
     fullscreen: data.menu.fullscreen,
     language: data.menu.language,
     help: data.menu.help,
-    about: data.menu.about
+    about: data.menu.about,
+    reloadApp: data.menu.reloadApp || 'Reload App (if the app seems stuck)'
   };
   return acc;
 }, {});
@@ -2139,6 +2140,20 @@ function createMenu(locale = 'en', isDev = false) {
           label: t.about,
           click: () => {
             mainWindow.webContents.send('menu-show-about');
+          }
+        },
+        { type: 'separator' },
+        // Recovery valve for a stuck client (e.g. the "can't edit after
+        // delete until refresh" issue) on packaged builds, where the
+        // dev-only Reload/Force Reload items below (gated on isDev) don't
+        // exist at all. Deliberately no keyboard accelerator — this must
+        // never be one accidental keypress away from reloading mid-show.
+        {
+          label: t.reloadApp,
+          click: () => {
+            if (mainWindow && mainWindow.webContents) {
+              mainWindow.webContents.reload();
+            }
           }
         }
       ]

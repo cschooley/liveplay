@@ -27,7 +27,8 @@
     "fullscreen": "Fullscreen",
     "language": "Language",
     "help": "Help",
-    "about": "About LivePlay"
+    "about": "About LivePlay",
+    "reloadApp": "Reload App (if the app seems stuck)"
   },
   "welcome": {
     "title": "LivePlay",
