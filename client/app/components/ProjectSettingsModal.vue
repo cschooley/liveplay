@@ -97,8 +97,12 @@
                 <option value="radio">{{ t('settings.outputTargetRadio') }}</option>
                 <option value="netflix">{{ t('settings.outputTargetNetflix') }}</option>
                 <option value="live">{{ t('settings.outputTargetLive') }}</option>
+                <option value="full-throttle">{{ t('settings.outputTargetFullThrottle') }}</option>
               </select>
               <p class="settings-help">{{ t('settings.outputTargetHelp') }}</p>
+              <p v-if="outputTarget === 'full-throttle'" class="settings-help settings-help--warning">
+                {{ t('settings.outputTargetFullThrottleWarning') }}
+              </p>
             </section>
           </template>
 
@@ -545,6 +549,10 @@ function close() {
   margin: 0;
   font-size: 12px;
   color: var(--color-text-secondary);
+}
+.settings-help--warning {
+  color: var(--color-warning);
+  font-weight: 600;
 }
 .settings-label--checkbox {
   flex-direction: row;

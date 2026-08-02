@@ -76,6 +76,8 @@
     "outputTargetRadio": "Radio Broadcast",
     "outputTargetNetflix": "Netflix / OTT",
     "outputTargetLive": "Live (Digital Console)",
+    "outputTargetFullThrottle": "Full Throttle (Maximum Output)",
+    "outputTargetFullThrottleWarning": "Deliberately aggressive — 12dB hotter than Live. Use only if the room is still too quiet at Live; test before a show, not during one.",
     "meterMode": "Meter Display",
     "meterModeHelp": "Unit shown on all stereo meters.",
     "meterModeLufs": "LUFS (Integrated Loudness)",

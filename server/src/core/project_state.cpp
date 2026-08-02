@@ -314,6 +314,15 @@ static const std::unordered_map<std::string, OutputTargetLevels> kOutputTargets 
     {"netflix",   {-32.0f, -32.0f, -24.0f, -24.0f, -2.0f,  -2.0f,  -27.0f, "LUFS", "#00e676"}},
     // Live / Digital Console — dBFS peaks, green comfort at -9 dBFS peak (-18 RMS)
     {"live",      {-24.0f, -24.0f, -9.0f,  -9.0f,  -0.1f,  -0.1f,  -18.0f, "dBFS", "#00e676"}},
+    // Full Throttle — deliberately aggressive, maximum-output preset for a
+    // show that's still too quiet at "Live" (e.g. driving a passive line-in
+    // on a powered speaker with no headroom to spare). auto_volume_target_db
+    // is 12dB hotter than "Live" — genuinely as loud as this software gets
+    // without guaranteed clipping, not a subtle bump. Deliberately only
+    // reachable via Project Settings > Output Target, never a hotkey/macro
+    // button, per explicit operator request — this should never be one
+    // accidental keypress away during a show.
+    {"full-throttle", {-18.0f, -18.0f, -6.0f, -6.0f, -0.1f, -0.1f, -6.0f, "dBFS", "#00e676"}},
 };
 
 static json compute_output_target_levels(const json& settings) {
