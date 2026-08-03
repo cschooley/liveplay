@@ -79,9 +79,13 @@ let _wsWired = false;
 // target here. removeActiveCue below restores the original endBehavior
 // (leaving the saved cue exactly as the operator configured it) and plays
 // the resolved target directly — never by writing it into endBehavior.
+export type LoopContinuationTarget =
+  | { action: 'arm'; targetUuid?: string; targetIndex?: number[] }
+  | { action: 'next' | 'goto-item' | 'goto-index'; targetUuid?: string; targetIndex?: number[] };
+
 const pendingLoopContinuations = new Map<string, {
   originalEndBehavior: { action: string; targetUuid?: string; targetIndex?: number[] };
-  advanceTarget: { action: 'next' | 'goto-item' | 'goto-index'; targetUuid?: string; targetIndex?: number[] };
+  advanceTarget: LoopContinuationTarget;
 }>();
 
 // A cue with a pending continuation has its live endBehavior armed to
@@ -96,13 +100,43 @@ export const hasPendingLoopContinuation = (uuid: string): boolean =>
 // Shared by cue-to-continue and jump-cue (keyboard, MIDI, and the per-cue UI
 // buttons): goto-item target → goto-index target → structural next, the same
 // precedence endBehavior already supports for non-loop cues today.
+//
+// Arm-next/arm-item/arm-index are checked first and resolve to 'arm', not a
+// play action — those end behaviours specifically mean "queue this as Up
+// Next, never auto-play," and ending a cue early (Jump Cue) must honour that
+// distinction rather than blindly playing whatever it would have armed.
+// cue-to-continue never reaches this branch in practice (it's only ever
+// called on cues whose action is already confirmed 'loop'), but the check is
+// unconditional here since this function is the single shared source of
+// truth for both callers.
 export const resolveLoopContinuationTarget = (
   item: AudioItem
-): { action: 'next' | 'goto-item' | 'goto-index'; targetUuid?: string; targetIndex?: number[] } => {
-  const { targetUuid, targetIndex } = item.endBehavior;
+): LoopContinuationTarget => {
+  const eb = item.endBehavior;
+  if (eb.action === 'arm-next' || eb.action === 'arm-item' || eb.action === 'arm-index') {
+    return { action: 'arm', targetUuid: eb.targetUuid, targetIndex: eb.targetIndex };
+  }
+  const { targetUuid, targetIndex } = eb;
   if (targetUuid) return { action: 'goto-item', targetUuid };
   if (targetIndex) return { action: 'goto-index', targetIndex };
   return { action: 'next' };
+};
+
+// Shared by resolvePendingLoopContinuation, queueLoopContinuation's
+// not-playing branch, and jumpCue: given a resolved target, find the actual
+// item to arm/play (structural next sibling of `item` when the target
+// carries no explicit uuid/index).
+const resolveAdvanceItem = (
+  item: AudioItem,
+  target: LoopContinuationTarget,
+  findItemByUuid: (uuid: string) => AudioItem | GroupItem | null,
+  findItemByIndex: (index: number[]) => AudioItem | GroupItem | null,
+): AudioItem | GroupItem | null => {
+  if (target.targetUuid) return findItemByUuid(target.targetUuid);
+  if (target.targetIndex) return findItemByIndex(target.targetIndex);
+  const nextIndex = [...item.index];
+  nextIndex[nextIndex.length - 1]++;
+  return findItemByIndex(nextIndex);
 };
 
 export const useAudioEngine = () => {
@@ -240,16 +274,18 @@ export const useAudioEngine = () => {
       server.updateProjectItem(uuid, { endBehavior: (item as AudioItem).endBehavior }).catch(() => {});
     }
 
-    let nextItem: AudioItem | GroupItem | null = null;
-    if (advanceTarget.action === 'goto-item' && advanceTarget.targetUuid) {
-      nextItem = findItemByUuid(advanceTarget.targetUuid);
-    } else if (advanceTarget.action === 'goto-index' && advanceTarget.targetIndex) {
-      nextItem = findItemByIndex(advanceTarget.targetIndex);
-    } else if (item) {
-      const nextIndex = [...item.index];
-      nextIndex[nextIndex.length - 1]++;
-      nextItem = findItemByIndex(nextIndex);
+    // Unreachable in practice (queueLoopContinuation/cue-to-continue is only
+    // ever invoked on cues already confirmed to be looping), but handled for
+    // type-correctness and consistency with jumpCue.
+    if (advanceTarget.action === 'arm') {
+      if (!item) return;
+      const target = resolveAdvanceItem(item as AudioItem, advanceTarget, findItemByUuid, findItemByIndex);
+      if (target) setNextItem(target.uuid);
+      return;
     }
+
+    if (!item) return;
+    const nextItem = resolveAdvanceItem(item as AudioItem, advanceTarget, findItemByUuid, findItemByIndex);
     if (nextItem) {
       if (nextItem.type === 'audio') playCue(nextItem as AudioItem);
       else if (nextItem.type === 'group') triggerGroup(nextItem);
@@ -270,21 +306,18 @@ export const useAudioEngine = () => {
   // above for why.
   const queueLoopContinuation = (
     item: AudioItem,
-    advanceTarget: { action: 'next' | 'goto-item' | 'goto-index'; targetUuid?: string; targetIndex?: number[] }
+    advanceTarget: LoopContinuationTarget
   ) => {
     if (!activeCues.value.has(item.uuid)) {
       // Not currently playing — nothing to finish. Advance directly, same as
       // removeActiveCue's post-stop step, without ever touching endBehavior.
-      let nextItem: AudioItem | GroupItem | null = null;
-      if (advanceTarget.action === 'goto-item' && advanceTarget.targetUuid) {
-        nextItem = findItemByUuid(advanceTarget.targetUuid);
-      } else if (advanceTarget.action === 'goto-index' && advanceTarget.targetIndex) {
-        nextItem = findItemByIndex(advanceTarget.targetIndex);
-      } else {
-        const nextIndex = [...item.index];
-        nextIndex[nextIndex.length - 1]++;
-        nextItem = findItemByIndex(nextIndex);
+      // 'arm' is unreachable here in practice — see resolvePendingLoopContinuation.
+      if (advanceTarget.action === 'arm') {
+        const target = resolveAdvanceItem(item, advanceTarget, findItemByUuid, findItemByIndex);
+        if (target) setNextItem(target.uuid);
+        return;
       }
+      const nextItem = resolveAdvanceItem(item, advanceTarget, findItemByUuid, findItemByIndex);
       if (nextItem) {
         if (nextItem.type === 'audio') playCue(nextItem as AudioItem);
         else if (nextItem.type === 'group') triggerGroup(nextItem);
@@ -307,8 +340,14 @@ export const useAudioEngine = () => {
     server.updateProjectItem(item.uuid, { endBehavior: item.endBehavior }).catch(() => {});
   };
 
-  // jump-cue (keyboard, MIDI, per-cue UI button): stop `item` right now and
-  // start whatever it would have advanced to — never touches endBehavior.
+  // jump-cue (keyboard, MIDI, per-cue UI button): end `item` right now and
+  // do whatever its End Behavior actually specifies — never touches
+  // endBehavior. This is the general "end this cue early" action, not
+  // loop-specific: an arm-next/arm-item/arm-index cue ended early ARMS its
+  // target as Up Next rather than auto-playing it, honouring the same
+  // "queue it, don't play it" contract those end behaviours have everywhere
+  // else. Every other action (next/goto-item/goto-index/loop) plays the
+  // resolved target immediately, same as before.
   const jumpCue = (item: AudioItem) => {
     // A Continue may already be in flight for this cue (endBehavior armed to
     // 'nothing', waiting for the pass to finish naturally). If so, cancel it
@@ -318,7 +357,7 @@ export const useAudioEngine = () => {
     // place would let it fire a SECOND time once this manual stop reaches
     // Stopped, double-triggering the next item.
     const pending = pendingLoopContinuations.get(item.uuid);
-    let advanceTarget: { action: 'next' | 'goto-item' | 'goto-index'; targetUuid?: string; targetIndex?: number[] };
+    let advanceTarget: LoopContinuationTarget;
     if (pending) {
       pendingLoopContinuations.delete(item.uuid);
       advanceTarget = pending.advanceTarget;
@@ -328,16 +367,15 @@ export const useAudioEngine = () => {
     } else {
       advanceTarget = resolveLoopContinuationTarget(item);
     }
-    let nextItem: AudioItem | GroupItem | null = null;
-    if (advanceTarget.action === 'goto-item' && advanceTarget.targetUuid) {
-      nextItem = findItemByUuid(advanceTarget.targetUuid);
-    } else if (advanceTarget.action === 'goto-index' && advanceTarget.targetIndex) {
-      nextItem = findItemByIndex(advanceTarget.targetIndex);
-    } else {
-      const nextIndex = [...item.index];
-      nextIndex[nextIndex.length - 1]++;
-      nextItem = findItemByIndex(nextIndex);
+
+    if (advanceTarget.action === 'arm') {
+      const target = resolveAdvanceItem(item, advanceTarget, findItemByUuid, findItemByIndex);
+      stopCue(item.uuid);
+      if (target) setNextItem(target.uuid);
+      return;
     }
+
+    const nextItem = resolveAdvanceItem(item, advanceTarget, findItemByUuid, findItemByIndex);
     stopCue(item.uuid);
     if (nextItem) {
       if (nextItem.type === 'audio') playCue(nextItem as AudioItem);
