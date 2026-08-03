@@ -838,6 +838,18 @@ static std::string handle_ws_message(crow::websocket::connection& conn,
             if (j.contains("item_uuid") && j["item_uuid"].is_string()) {
                 const auto uuid = j["item_uuid"].get<std::string>();
                 Logger::playback("PLAY: {}", item_playback_info(uuid, state));
+                // A direct, operator-initiated play always supersedes
+                // whatever was previously armed as "Up Next" — a stale
+                // manual override from an earlier arm (that the operator
+                // then skipped past by jumping/playing something else
+                // entirely) must not silently hijack a later Play Next
+                // press. trigger_item's own group-arming-consumption path
+                // only clears the override when it matches THIS uuid; this
+                // covers every other case.
+                const auto stale = state.next_item_override();
+                if (!stale.empty() && stale != uuid) {
+                    state.set_next_item_override("", false);
+                }
                 // trigger_item dispatches by item type: audio → play_item,
                 // group → walks startBehavior. Without this, WS plays of
                 // group items were silently ignored.
@@ -852,6 +864,10 @@ static std::string handle_ws_message(crow::websocket::connection& conn,
                     // (e.g. ad-hoc /api/cues registrations with no item).
                     if (auto uuid = state.cue_to_item_uuid(*cue)) {
                         Logger::playback("PLAY: {}", item_playback_info(*uuid, state));
+                        const auto stale = state.next_item_override();
+                        if (!stale.empty() && stale != *uuid) {
+                            state.set_next_item_override("", false);
+                        }
                         state.play_item(*uuid);
                     } else {
                         Logger::playback("PLAY: cue_id={} (orphan)", cue->value);
@@ -1451,6 +1467,12 @@ void ControlServer::install_routes() {
             const std::string uuid = state_.cart_slot_item_uuid(slot);
             if (uuid.empty()) return json_err(404, "cart slot is empty");
             Logger::playback("CART {}: {}", slot, item_playback_info(uuid, state_));
+            // A direct external trigger supersedes whatever was previously
+            // armed as "Up Next" — see the WS "play" handler's comment.
+            {
+                const auto stale = state_.next_item_override();
+                if (!stale.empty() && stale != uuid) state_.set_next_item_override("", false);
+            }
             if (!state_.trigger_item(uuid))
                 return json_err(404, "item not loaded into engine");
             return json_ok(json({{"ok", true}, {"slot", slot}, {"uuid", uuid}}));
@@ -2642,6 +2664,10 @@ void ControlServer::install_routes() {
             Logger::api_request("Client ({}) -> Server ({}) : {} /api/project/items/{}/play",
                                 req.remote_ip_address, impl_->server_addr, m, uuid);
             Logger::playback("PLAY: {}", item_playback_info(uuid, state_));
+            // A direct external trigger supersedes whatever was previously
+            // armed as "Up Next" — see the WS "play" handler's comment.
+            const auto stale = state_.next_item_override();
+            if (!stale.empty() && stale != uuid) state_.set_next_item_override("", false);
             if (!state_.play_item(uuid)) {
                 Logger::warn("PLAY item_uuid={} — item not loaded into engine", uuid);
                 return json_err(404, "item not loaded into engine");
@@ -2695,6 +2721,12 @@ void ControlServer::install_routes() {
                 return json_err(404, "no item at that index");
             }
             Logger::playback("TRIGGER: {}", item_playback_info(uuid, state_));
+            // A direct external trigger supersedes whatever was previously
+            // armed as "Up Next" — see the WS "play" handler's comment.
+            {
+                const auto stale = state_.next_item_override();
+                if (!stale.empty() && stale != uuid) state_.set_next_item_override("", false);
+            }
             if (!state_.trigger_item(uuid)) {
                 Logger::warn("TRIGGER by-index '{}' uuid={} — item not loaded into engine",
                              index_path, uuid);
