@@ -23,6 +23,15 @@
     >
       {{ t('project.silenceWarning') }} {{ Math.ceil(silenceWarning) }} {{ t('project.seconds') }}
     </div>
+    <div
+      v-else-if="nextCueLines.length"
+      ref="warningRef"
+      class="silence-warning next-cue-info"
+      :class="{ 'silence-warning--left': warningMode === 'left' }"
+      :style="warningStyle"
+    >
+      <div v-for="line in nextCueLines" :key="line.uuid" class="next-cue-line">{{ line.text }}</div>
+    </div>
 
     <div ref="rightRef" class="header-right">
       <!-- Appears the moment the socket drops; spins for as long as we retry. -->
@@ -109,7 +118,16 @@ const showProjectSettings = useState('showProjectSettings', () => false);
 const isDark = computed(() => currentProject.value?.theme.mode === 'dark');
 const currentTime = ref('00:00:00');
 
-// ---- Silence warning -------------------------------------------------------
+// ---- Silence warning / "always show what's next" banner -------------------
+// Mutually exclusive modes, not independent toggles — turning on "always
+// show what's next" replaces the silence warning, it doesn't add to it.
+// Falls back to the old disableSilenceWarning boolean for projects saved
+// before this existed.
+const silenceBannerMode = computed<'warn' | 'always-next' | 'off'>(() => {
+  const s = (currentProject.value as any)?.settings;
+  if (s?.silenceBannerMode) return s.silenceBannerMode;
+  return s?.disableSilenceWarning ? 'off' : 'warn';
+});
 
 const silenceWarning = ref<number | null>(null);
 
@@ -138,7 +156,8 @@ const warningRef = ref<HTMLElement | null>(null);
 
 const warningMode = ref<'center' | 'gap' | 'left'>('center');
 const warningLeftPx = ref(0);
-const hideTitle = computed(() => !!silenceWarning.value && warningMode.value === 'left');
+const hideTitle = computed(() =>
+  (!!silenceWarning.value || nextCueLines.value.length > 0) && warningMode.value === 'left');
 
 const warningStyle = computed(() => ({
   left: `${warningLeftPx.value}px`,
@@ -186,17 +205,11 @@ function recomputeWarningPlacement() {
   warningLeftPx.value = logoEdge + PLACEMENT_MARGIN;
 }
 
-// Recompute whenever the displayed text changes (digit count shifts width) or
-// the header is resized.
-watch(() => [silenceWarning.value, isDark.value], () => {
-  nextTick(recomputeWarningPlacement);
-});
 
 const checkForSilence = () => {
-  // The user can opt out of the silence warning entirely in project settings.
   if (!currentProject.value
       || activeCues.value.size === 0
-      || (currentProject.value as any).settings?.disableSilenceWarning) {
+      || silenceBannerMode.value !== 'warn') {
     silenceWarning.value = null;
     return;
   }
@@ -268,6 +281,94 @@ const validateEndBehavior = (audioItem: any): boolean => {
   if (action === 'loop') return true;
   return false;
 };
+
+// ---- "Always show what's next" banner --------------------------------------
+// Describes what a cue's End Behavior will actually do, resolved to real
+// names — never a raw uuid/index — so it reads the same way a human would
+// describe it out loud.
+const describeNextForItem = (item: any): string => {
+  const eb = item.endBehavior ?? {};
+  const nothing = t('project.nextNothing');
+
+  const structuralNext = () => {
+    const nextIndex = [...item.index];
+    nextIndex[nextIndex.length - 1]++;
+    return findItemByIndex(nextIndex);
+  };
+
+  switch (eb.action) {
+    case 'next': {
+      const next = structuralNext();
+      return next ? next.displayName : nothing;
+    }
+    case 'goto-item': {
+      const target = eb.targetUuid ? findItemByUuid(eb.targetUuid) : null;
+      return target ? target.displayName : nothing;
+    }
+    case 'goto-index': {
+      const target = eb.targetIndex ? findItemByIndex(eb.targetIndex) : null;
+      return target
+        ? `${target.displayName} (${t('project.index')} ${eb.targetIndex.join(',')})`
+        : nothing;
+    }
+    case 'loop': {
+      // What Continue/Jump Cue would actually resolve to if this loop were
+      // exited right now — same precedence they use, not a separate guess.
+      const resolved = resolveLoopContinuationTarget(item);
+      let target: any = null;
+      if (resolved.action === 'goto-item' && resolved.targetUuid) target = findItemByUuid(resolved.targetUuid);
+      else if (resolved.action === 'goto-index' && resolved.targetIndex) target = findItemByIndex(resolved.targetIndex);
+      else target = structuralNext();
+      return target ? target.displayName : nothing;
+    }
+    case 'arm-next': {
+      const target = structuralNext();
+      return target ? t('project.nextArm', { name: target.displayName }) : nothing;
+    }
+    case 'arm-item': {
+      const target = eb.targetUuid ? findItemByUuid(eb.targetUuid) : null;
+      return target ? t('project.nextArm', { name: target.displayName }) : nothing;
+    }
+    case 'arm-index': {
+      const target = eb.targetIndex ? findItemByIndex(eb.targetIndex) : null;
+      return target
+        ? t('project.nextArmIndex', { name: target.displayName, index: eb.targetIndex.join(',') })
+        : nothing;
+    }
+    case 'nothing':
+    default:
+      return nothing;
+  }
+};
+
+const nextCueLines = computed<{ uuid: string; text: string }[]>(() => {
+  if (silenceBannerMode.value !== 'always-next' || !currentProject.value) return [];
+  const lines: { uuid: string; text: string }[] = [];
+  for (const [uuid] of activeCues.value) {
+    const item = findItemByUuid(uuid);
+    if (!item || item.type !== 'audio') continue;
+    const audioItem = item as any;
+    // Mid-Continue, the item's live endBehavior temporarily reads 'nothing'
+    // (see pendingLoopContinuationOriginalEndBehavior's own comment) — use
+    // the operator's real configured behavior so the banner keeps reading
+    // "Looping X" throughout instead of flickering to "Nothing" and back.
+    const pendingOriginal = pendingLoopContinuationOriginalEndBehavior(uuid);
+    const effectiveItem = pendingOriginal ? { ...audioItem, endBehavior: pendingOriginal } : audioItem;
+    const isLooping = effectiveItem.endBehavior?.action === 'loop';
+    const mainLabel = isLooping
+      ? t('project.nowLooping', { name: audioItem.displayName })
+      : t('project.nowPlaying', { name: audioItem.displayName });
+    const nextText = describeNextForItem(effectiveItem);
+    lines.push({ uuid, text: `${mainLabel}. ${t('project.next')}: ${nextText}.` });
+  }
+  return lines;
+});
+
+// Recompute placement whenever the displayed text changes (digit/line count
+// shifts width/height) or the header is resized.
+watch(() => [silenceWarning.value, nextCueLines.value.length, isDark.value], () => {
+  nextTick(recomputeWarningPlacement);
+}, { deep: true });
 
 // ---- Wall clock ------------------------------------------------------------
 
@@ -528,6 +629,20 @@ onMounted(() => {
    layout box, so placement geometry stays stable (no flip-flopping). */
 .project-name--hidden {
   visibility: hidden;
+}
+
+/* "Always show what's next" — informational, not an alarm: calm accent
+   color, no flashing, and unlike the single-line silence warning it can
+   stack one line per active cue. */
+.next-cue-info {
+  background-color: var(--color-accent);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.next-cue-line {
+  white-space: nowrap;
 }
 
 .silence-warning.warning-yellow  { background-color: #fbbf24; }

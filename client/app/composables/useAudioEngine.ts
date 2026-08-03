@@ -97,6 +97,16 @@ const pendingLoopContinuations = new Map<string, {
 export const hasPendingLoopContinuation = (uuid: string): boolean =>
   pendingLoopContinuations.has(uuid);
 
+// The operator's actual configured End Behavior for a cue mid-Continue —
+// 'loop', not the live 'nothing' the item currently carries. For display
+// surfaces (e.g. the "always show what's next" banner) that want to keep
+// describing the cue as looping/its real target throughout the pending
+// window, not flicker to "nothing" and back.
+export const pendingLoopContinuationOriginalEndBehavior = (
+  uuid: string
+): { action: string; targetUuid?: string; targetIndex?: number[] } | null =>
+  pendingLoopContinuations.get(uuid)?.originalEndBehavior ?? null;
+
 // Shared by cue-to-continue and jump-cue (keyboard, MIDI, and the per-cue UI
 // buttons): goto-item target → goto-index target → structural next, the same
 // precedence endBehavior already supports for non-loop cues today.

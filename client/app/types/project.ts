@@ -170,6 +170,13 @@ export interface ProjectSettings {
   disableAutoVolumeAndTrim?: boolean;
   disableLimiter?: boolean;
   disableSilenceWarning?: boolean;
+  // Supersedes disableSilenceWarning when set — a three-way choice instead of
+  // a boolean, since "always show what's next" is a distinct mode from
+  // either "warn near silence" or "no banner at all", not just "silence
+  // warning, but louder." Falls back to disableSilenceWarning (old boolean)
+  // for projects saved before this existed: undefined here + disableSilenceWarning
+  // true → 'off', undefined + false/unset → 'warn'.
+  silenceBannerMode?: 'warn' | 'always-next' | 'off';
   autoSave?: boolean;
 
   /**

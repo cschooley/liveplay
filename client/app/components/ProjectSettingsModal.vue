@@ -193,17 +193,28 @@
               <p class="settings-help">{{ t('settings.disableLimiterHelp') }}</p>
             </section>
 
-            <!-- Disable silence warning -->
+            <!-- End-of-cue header banner: three mutually exclusive modes,
+                 not independent checkboxes — "always show what's next"
+                 replaces the silence warning entirely rather than adding
+                 to it. -->
             <section class="settings-field">
+              <label class="settings-label">{{ t('settings.silenceBannerMode') }}</label>
               <label class="settings-label settings-label--checkbox">
-                <input
-                  type="checkbox"
-                  :checked="disableSilenceWarning"
-                  @change="onDisableSilenceWarningChange"
-                />
-                {{ t('settings.disableSilenceWarning') }}
+                <input type="radio" name="silenceBannerMode" value="warn"
+                       :checked="silenceBannerMode === 'warn'" @change="onSilenceBannerModeChange('warn')" />
+                {{ t('settings.silenceBannerModeWarn') }}
               </label>
-              <p class="settings-help">{{ t('settings.disableSilenceWarningHelp') }}</p>
+              <label class="settings-label settings-label--checkbox">
+                <input type="radio" name="silenceBannerMode" value="always-next"
+                       :checked="silenceBannerMode === 'always-next'" @change="onSilenceBannerModeChange('always-next')" />
+                {{ t('settings.silenceBannerModeAlwaysNext') }}
+              </label>
+              <label class="settings-label settings-label--checkbox">
+                <input type="radio" name="silenceBannerMode" value="off"
+                       :checked="silenceBannerMode === 'off'" @change="onSilenceBannerModeChange('off')" />
+                {{ t('settings.silenceBannerModeOff') }}
+              </label>
+              <p class="settings-help">{{ t('settings.silenceBannerModeHelp') }}</p>
             </section>
           </template>
 
@@ -320,7 +331,12 @@ const ltcDeviceId            = computed(() => (currentProject.value as any)?.set
 const outputTarget           = computed(() => (currentProject.value as any)?.settings?.outputTarget || 'ebu-r128');
 const disableAutoVolumeAndTrim = computed(() => !!(currentProject.value as any)?.settings?.disableAutoVolumeAndTrim);
 const disableLimiter           = computed(() => !!(currentProject.value as any)?.settings?.disableLimiter);
-const disableSilenceWarning    = computed(() => !!(currentProject.value as any)?.settings?.disableSilenceWarning);
+// Falls back to the old boolean for projects saved before this existed.
+const silenceBannerMode = computed<'warn' | 'always-next' | 'off'>(() => {
+  const s = (currentProject.value as any)?.settings;
+  if (s?.silenceBannerMode) return s.silenceBannerMode;
+  return s?.disableSilenceWarning ? 'off' : 'warn';
+});
 const defaultTransitionMode    = computed(() => (currentProject.value as any)?.settings?.defaultTransitionMode || 'crossfade');
 const indexDisplayStart        = computed(() => normalizeIndexDisplayStart((currentProject.value as any)?.settings?.indexDisplayStart));
 // Defaults ON (undefined → true) so legacy projects and new projects both
@@ -394,8 +410,11 @@ function onDisableAutoVolumeAndTrimChange(e: Event) {
 function onDisableLimiterChange(e: Event) {
   applyPatch({ disableLimiter: (e.target as HTMLInputElement).checked });
 }
-function onDisableSilenceWarningChange(e: Event) {
-  applyPatch({ disableSilenceWarning: (e.target as HTMLInputElement).checked });
+function onSilenceBannerModeChange(mode: 'warn' | 'always-next' | 'off') {
+  // Keep the legacy boolean in sync too, purely so older code paths reading
+  // it directly don't see a stale/contradictory value — silenceBannerMode
+  // is what's actually read (see the computed above).
+  applyPatch({ silenceBannerMode: mode, disableSilenceWarning: mode === 'off' });
 }
 function onDefaultTransitionModeChange(e: Event) {
   applyPatch({ defaultTransitionMode: (e.target as HTMLSelectElement).value });
