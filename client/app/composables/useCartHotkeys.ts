@@ -254,6 +254,11 @@ export const useCartHotkeys = () => {
   };
 
   const handleKeydown = (e: KeyboardEvent) => {
+    // e.repeat is true for every auto-repeated keydown the OS fires while a
+    // key stays held — without this, holding a cue/transport key even
+    // slightly too long re-fires the action on each repeat (double/triple-
+    // triggering cues), not just once on the initial press.
+    if (e.repeat) return;
     if (isTextInputFocused()) return;
     if (!currentProject.value) return;
 
